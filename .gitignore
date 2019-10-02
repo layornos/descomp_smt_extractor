@@ -16,3 +16,6 @@
 
 # generated output files
 *.smt
+
+
+extract_smt
