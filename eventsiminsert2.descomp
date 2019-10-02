@@ -1,0 +1,111 @@
+create-simulator --description "EventSim2" --name "EventSim2"
+set-current-simulator --simulator EventSim2
+add-entity --name OpenWorkloadGenerator
+add-attributes-to-entity --attribute-name interarrivalTime --entity-name OpenWorkloadGenerator --type DOUBLE
+add-entity --name ClosedWorkloadGenerator
+add-attributes-to-entity --attribute-name thinkTime --entity-name ClosedWorkloadGenerator --type DOUBLE
+add-attributes-to-entity --attribute-name population --entity-name ClosedWorkloadGenerator --type INT
+add-entity --name SimHDDActiveResource
+add-attributes-to-entity --attribute-name writeProcessingRate --entity-name SimHDDActiveResource --type DOUBLE
+add-attributes-to-entity --attribute-name readProcessingRate --entity-name SimHDDActiveResource --type DOUBLE
+add-entity --name SimLinkingResource
+add-attributes-to-entity --attribute-name latency --entity-name SimLinkingResource --type DOUBLE
+add-attributes-to-entity --attribute-name throughput --entity-name SimLinkingResource --type DOUBLE
+add-entity --name SimProcessorSharingResource
+add-attributes-to-entity --attribute-name "countOfRunningProcesses" --entity-name SimProcessorSharingResource --type INT
+add-attributes-to-entity --attribute-name capacity --entity-name SimProcessorSharingResource --type INT
+add-entity --name Process
+add-attributes-to-entity --attribute-name demand --entity-name Process --type DOUBLE
+add-entity --name SimFCFSResource
+add-event --name UserArrivalOpenWorkload
+add-read-attribute-to-event --attribute-name interarrivalTime --entity-name OpenWorkloadGenerator --event-name UserArrivalOpenWorkload
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun interarrivalTime () Real)(declare-fun delay () Real)(assert (= delay interarrivalTime))" --end-event-name "UserArrivalOpenWorkload" --start-event-name "UserArrivalOpenWorkload"
+add-event --name UserArrivalClosedWorkload
+add-read-attribute-to-event --attribute-name thinkTime --entity-name ClosedWorkloadGenerator --event-name UserArrivalClosedWorkload
+add-read-attribute-to-event --attribute-name population --entity-name ClosedWorkloadGenerator --event-name UserArrivalClosedWorkload
+add-event --name ProcessUsageScenario
+add-schedules-relation --condition-function "(declare-fun population () Int) (assert (>= population 1))" --delay-function "(declare-fun thinkTime () Real)(declare-fun delay () Real)(assert (= delay thinkTime))" --start-event-name UserArrivalClosedWorkload --end-event-name ProcessUsageScenario
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --start-event-name UserArrivalOpenWorkload --end-event-name ProcessUsageScenario
+add-entity --name UsageScenario
+add-attributes-to-entity --attribute-name actions --entity-name UsageScenario --type ARRAY[ACTION]
+add-event --name DelayAction
+add-schedules-relation --condition-function "(declare-datatypes ((actions 0)) (((DelayAction) (EntryLevelSystemCall) (END)))) (declare-fun behavior () (Array Int UsageBehavior)) (assert (= (select behavior 0) DelayAction))" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --start-event-name ProcessUsageScenario --end-event-name DelayAction
+add-entity --name "Delay"
+add-attributes-to-entity --attribute-name delay --entity-name Delay --type DOUBLE
+add-read-attribute-to-event --attribute-name delay --entity-name Delay --event-name DelayAction
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun delaySpecification () Real)(declare-fun delay () Real)(assert (= delay delaySpecification))" --start-event-name DelayAction --end-event-name ProcessUsageScenario
+add-read-attribute-to-event --attribute-name actions --entity-name UsageScenario --event-name ProcessUsageScenario
+add-event --name ProcessRDSEFF
+add-event --name EntryLevelSystemCall
+add-schedules-relation --condition-function "(declare-datatypes ((actions 0)) (((DelayAction) (EntryLevelSystemCall) (END)))) (declare-fun behavior () (Array Int actions)) (assert (= (select behavior 0) EntryLevelSystemCall))" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --start-event-name ProcessUsageScenario --end-event-name EntryLevelSystemCall
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --start-event-name EntryLevelSystemCall --end-event-name ProcessRDSEFF
+add-event --name UsageScenarioFinished
+add-schedules-relation --condition-function "(declare-datatypes ((actions 0)) (((DelayAction) (EntryLevelSystemCall) (END)))) (declare-fun behavior () (Array Int actions)) (assert (= (select behavior 0) END))" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --start-event-name ProcessUsageScenario --end-event-name UsageScenarioFinished
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --start-event-name UsageScenarioFinished --end-event-name UserArrivalClosedWorkload
+add-write-attribute-to-event --attribute-name population --condition "(assert true)" --write-function "(declare-fun population () Int)	(declare-fun value () Int)	(assert (= value (+ population 1)))" --entity-name ClosedWorkloadGenerator --event-name UsageScenarioFinished
+add-write-attribute-to-event --attribute-name population --condition "(declare-fun population () Int) (assert (>= population 1))" --write-function "(declare-fun population () Int)	(declare-fun value () Int)	(assert (= value (- population 1)))" --entity-name ClosedWorkloadGenerator --event-name UserArrivalClosedWorkload
+add-entity --name PassiveResource
+add-attributes-to-entity --attribute-name capacity --entity-name PassiveResource --type INT
+add-event --name AcquireAction
+add-event --name ReleaseAction
+add-attributes-to-entity --attribute-name waitingProcesses --entity-name PassiveResource --type ARRAY[INT]
+add-attributes-to-entity --attribute-name waitingProcessesCount --entity-name PassiveResource --type INT
+add-write-attribute-to-event --attribute-name waitingProcessesCount --entity-name PassiveResource --condition "(assert true)" --event-name AcquireAction --write-function "(declare-fun waitingProcessesCount () Int)	(declare-fun value () Int)	(assert (= value (+ waitingProcessesCount 1)))"
+add-write-attribute-to-event --attribute-name waitingProcessesCount --entity-name PassiveResource --condition "(assert true)" --event-name ReleaseAction --write-function "(declare-fun waitingProcessesCount () Int)	(declare-fun value () Int)	(assert (= value (- waitingProcessesCount 1)))"
+add-event --name BlockPassiveResource
+add-event --name ReleasePassiveResource
+add-read-attribute-to-event --attribute-name capacity --entity-name PassiveResource --event-name BlockPassiveResource
+add-read-attribute-to-event --attribute-name capacity --entity-name PassiveResource --event-name ReleasePassiveResource
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --start-event-name ReleaseAction --end-event-name ReleasePassiveResource
+add-write-attribute-to-event --attribute-name capacity --entity-name PassiveResource --condition "(assert true)" --event-name ReleasePassiveResource --write-function "(declare-fun capacity () Int) (declare-fun demand () Int)	(declare-fun value () Int)	(assert (= value (+ demand capacity)))"
+add-write-attribute-to-event --attribute-name capacity --entity-name PassiveResource --condition "(assert true)" --event-name BlockPassiveResource --write-function "(declare-fun capacity () Int) (declare-fun demand () Int)	(declare-fun value () Int)	(assert (= value (- capacity demand)))"
+add-write-attribute-to-event --attribute-name capacity --entity-name PassiveResource --condition "(assert true)" --event-name BlockPassiveResource --write-function "(declare-fun capacity () Int) (declare-fun demand () Int)	(declare-fun value () Int)	(assert (= value (- capacity demand)))"
+add-schedules-relation --start-event-name AcquireAction --end-event-name BlockPassiveResource --condition-function "(declare-fun capacity () Int)(declare-fun demand () Int)(assert (<= demand capacity))" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))"
+add-write-attribute-to-event --attribute-name waitingProcesses --condition "(declare-fun capacity () Int)(declare-fun demand () Int)(assert (> demand capacity))" --entity-name PassiveResource --event-name AcquireAction --write-function "(declare-fun processId () Int) (declare-fun waitingProcessCount () Int)	(declare-fun waitingProcesses () (Array Int Int))(declare-fun value () (Array Int Int))	(assert (= value (store waitingProcesses (+ waitingProcessCount 1) processId)))"
+add-event --name CalculateLinkingResourceDemand
+add-read-attribute-to-event --attribute-name latency --entity-name SimLinkingResource --event-name CalculateLinkingResourceDemand
+add-write-attribute-to-event --attribute-name demand --condition "(assert true)" --entity-name Process --event-name CalculateLinkingResourceDemand --write-function "(declare-fun throughput () Real)(declare-fun abstractDemand () Real)(declare-fun latency () Real)(declare-fun value () Real)(assert (= value (+ latency (/ abstractDemand throughput))))"
+add-read-attribute-to-event --attribute-name throughput --entity-name SimLinkingResource --event-name CalculateLinkingResourceDemand
+add-event --name CalculateHDDActiveResourceDemand
+add-entity --name Request
+add-attributes-to-entity --attribute-name abstractDemand --entity-name Request --type DOUBLE
+add-attributes-to-entity --attribute-name type --entity-name Request --type INT
+add-write-attribute-to-event --attribute-name demand --entity-name Process --condition "(declare-fun type () Int) (assert (= type 1))" --event-name CalculateHDDActiveResourceDemand --write-function "(declare-fun readProcessingRate () Real)(declare-fun abstractDemand () Real)(declare-fun value () Real)(assert (= value (/ abstractDemand readProcessingRate)))"
+add-write-attribute-to-event --attribute-name demand --entity-name Process --condition "(declare-fun type () Int) (assert (= type 2))" --event-name CalculateHDDActiveResourceDemand --write-function "(declare-fun writeProcessingRate () Real)(declare-fun abstractDemand () Real)(declare-fun value () Real)(assert (= value (/ abstractDemand writeProcessingRate)))"
+add-read-attribute-to-event --attribute-name writeProcessingRate --entity-name SimHDDActiveResource --event-name CalculateHDDActiveResourceDemand
+add-read-attribute-to-event --attribute-name readProcessingRate --entity-name SimHDDActiveResource --event-name CalculateHDDActiveResourceDemand
+add-read-attribute-to-event --attribute-name abstractDemand --entity-name Request --event-name CalculateHDDActiveResourceDemand
+add-read-attribute-to-event --attribute-name abstractDemand --entity-name Request --event-name CalculateLinkingResourceDemand
+add-entity --name "SimActiveResource"
+add-attributes-to-entity --attribute-name processingRate --entity-name SimActiveResource --type DOUBLE
+add-event --name CalculateActiveResourceDemand
+add-read-attribute-to-event --attribute-name abstractDemand --entity-name Request --event-name CalculateActiveResourceDemand
+add-read-attribute-to-event --attribute-name processingRate --entity-name SimActiveResource --event-name CalculateActiveResourceDemand
+add-write-attribute-to-event --attribute-name demand --condition "(assert true)" --entity-name "Process" --event-name CalculateActiveResourceDemand --write-function "(declare-fun processingRate () Real)(declare-fun abstractDemand () Real)(declare-fun value () Real)(assert (= value (/ abstractDemand processingRate)))"
+add-event --name ExternalCall
+add-write-attribute-to-event --attribute-name abstractDemand --condition "(declare-fun simulateThroughput () Bool)	(declare-fun value () Bool)	(assert (= value (= simulateThroughput true)))" --entity-name Request --event-name ExternalCall --write-function "(declare-fun sumOfBytes () Real) (declare-fun value () Real) (assert (= value sumOfBytes))"
+add-write-attribute-to-event --attribute-name abstractDemand --condition "(declare-fun simulateThroughput () Bool)	(declare-fun value () Bool)	(assert (= value (= simulateThroughput false)))" --entity-name Request --event-name ExternalCall --write-function "(declare-fun value () Real) (assert (= value 0.0))"
+add-entity --name SimulationProperty
+add-attributes-to-entity --attribute-name simulateThroughput --entity-name SimulationProperty --type BOOL
+add-read-attribute-to-event --attribute-name simulateThroughput --entity-name SimulationProperty --event-name ExternalCall
+add-entity --name RequestSpecification
+add-attributes-to-entity --attribute-name sumOfBytes --entity-name RequestSpecification --type DOUBLE
+add-read-attribute-to-event --attribute-name sumOfBytes --entity-name RequestSpecification --event-name ExternalCall
+add-read-attribute-to-event --attribute-name type --entity-name Request --event-name CalculateHDDActiveResourceDemand
+add-event ConsumeSimProcessorSharingResource
+add-read-attribute-to-event --attribute-name capacity --event-name ConsumeSimProcessorSharingResource --entity-name SimProcessorSharingResource
+add-read-attribute-to-event --attribute-name countOfRunningProcesses --event-name ConsumeSimProcessorSharingResource --entity-name SimProcessorSharingResource
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun capacity () Real)(declare-fun countOfRunningProcesses () Real)	(declare-fun speed () Real)	(declare-fun delay () Real)	(assert (= speed (ite (<= (/ countOfRunningProcesses capacity) 1.0) 1.0 (/ countOfRunningProcesses capacity)))) (assert (= delay (* speed demand)))" --end-event-name ConsumeSimProcessorSharingResource --start-event-name ConsumeSimProcessorSharingResource
+add-event --name ConsumeSimFCFSResource
+add-event --name ConsumeSimDelayResource
+add-read-attribute-to-event --attribute-name demand --entity-name Process --event-name ConsumeSimProcessorSharingResource
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun demand () Real)(declare-fun delay () Real)(assert (= delay demand))" --end-event-name ProcessRDSEFF --start-event-name ConsumeSimDelayResource
+add-read-attribute-to-event --attribute-name demand --entity-name Process --event-name ConsumeSimDelayResource
+add-entity --name RDSEFF
+add-attributes-to-entity --attribute-name actions --entity-name RDSEFF --type ARRAY[ACTION]
+add-attributes-to-entity --attribute-name waitingProcesses --entity-name SimFCFSResource --type ACTION[INT]
+add-attributes-to-entity --attribute-name waitingProcessesCount --entity-name SimFCFSResource --type ACTION[INT]
+add-read-attribute-to-event --attribute-name waitingProcesses --entity-name SimFCFSResource --event-name ConsumeSimFCFSResource
+add-read-attribute-to-event --attribute-name demand --entity-name Process --event-name ConsumeSimFCFSResource
+add-schedules-relation --condition-function "(declare-datatypes ((actions 0)) (((AcquireAction) (ExternalCall) (ReleaseAction) (InternalAction))))	(declare-fun behavior () (Array Int actions)) (assert (= (select behavior 0) ReleaseAction))" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --end-event-name "ReleaseAction" --start-event-name ProcessRDSEFF
+add-schedules-relation --condition-function "(declare-datatypes ((actions 0)) (((AcquireAction) (ExternalCall) (ReleaseAction) (InternalAction))))	(declare-fun behavior () (Array Int actions)) (assert (= (select behavior 0) AcquireAction))" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --end-event-name "AcquireAction" --start-event-name ProcessRDSEFF

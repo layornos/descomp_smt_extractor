@@ -1,0 +1,40 @@
+create-simulator --name "BusSimulation" --description "Example Simulation from AbstractSimEngine (https://github.com/PalladioSimulator/Palladio-Simulation-AbstractSimEngine.git)"
+set-current-simulator --simulator BusSimulation
+add-entity --name Bus
+add-entity --name BusStop
+add-attributes-to-entity --attribute-name "waitingPassengers" --entity-name "BusStop" --type INT
+add-entity --name SimulationProperty
+add-attributes-to-entity --attribute-name "interarrivalTime" --entity-name "SimulationProperty" --type DOUBLE
+add-event --name PassengerArrival
+add-read-attribute-to-event --attribute-name interarrivalTime --entity-name SimulationProperty --event-name PassengerArrival
+add-read-attribute-to-event --attribute-name waitingPassengers --entity-name BusStop --event-name PassengerArrival
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun interarrivalTime () Real)(declare-fun delay () Real)(assert (= delay interarrivalTime))" --end-event-name "PassengerArrival" --start-event-name "PassengerArrival"
+add-write-attribute-to-event --attribute-name waitingPassengers --entity-name BusStop --event-name PassengerArrival --write-function "(declare-fun waitingPassengers () Int) (declare-fun value () Int)(assert (= value (+ 1 waitingPassengers)))" --condition "(assert true)"
+add-event --name Arrive
+add-event --name LoadFinished
+add-event --name Travel
+add-event --name UnloadingFinished
+add-event --name UnloadPassengers
+add-event --name LoadPassengers
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --end-event-name UnloadPassengers --start-event-name Arrive
+add-attributes-to-entity --attribute-name occupiedSeats --entity-name Bus --type INT
+add-read-attribute-to-event --attribute-name occupiedSeats --entity-name Bus --event-name UnloadPassengers
+add-attributes-to-entity --attribute-name "UNLOADING_TIME_PER_PASSENGER" --entity-name "SimulationProperty" --type DOUBLE
+add-read-attribute-to-event --attribute-name UNLOADING_TIME_PER_PASSENGER --entity-name SimulationProperty --event-name UnloadPassengers
+add-schedules-relation --condition-function "(assert true)" --end-event-name "UnloadingFinished" --start-event-name "UnloadPassengers" --delay-function "(declare-fun occupiedSeats () Real) (declare-fun UNLOADING_TIME_PER_PASSENGER () Real)	(declare-fun delay () Real) (assert (= delay (* UNLOADING_TIME_PER_PASSENGER occupiedSeats)))"
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --end-event-name LoadPassengers --start-event-name UnloadingFinished
+add-attributes-to-entity --attribute-name "LOADING_TIME_PER_PASSENGER" --entity-name "SimulationProperty" --type DOUBLE
+add-read-attribute-to-event --attribute-name LOADING_TIME_PER_PASSENGER --entity-name SimulationProperty --event-name LoadPassengers
+add-attributes-to-entity --attribute-name totalSeats --entity-name Bus --type INT
+add-read-attribute-to-event --attribute-name totalSeats --entity-name Bus --event-name LoadPassengers
+add-read-attribute-to-event --attribute-name waitingPassengers --entity-name BusStop --event-name LoadPassengers
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun servedPassengers () Int)(declare-fun delay () Real)(declare-fun LOADING_TIME_PER_PASSENGER () Real)(declare-fun totalSeats () Int)(declare-fun waitingPassengers () Int)(assert (= servedPassengers (ite (<= waitingPassengers totalSeats) waitingPassengers totalSeats))) (assert (= delay (* LOADING_TIME_PER_PASSENGER (to_real servedPassengers))))" --end-event-name LoadFinished --start-event-name LoadPassengers
+add-schedules-relation --condition-function "(assert true)" --delay-function "(declare-fun delay () Real) (assert (= delay 0.0))" --end-event-name "Travel" --start-event-name "LoadFinished"
+add-entity --name RouteSegment
+add-attributes-to-entity --attribute-name distance --entity-name RouteSegment --type INT
+add-attributes-to-entity --attribute-name averageSpeed --entity-name RouteSegment --type INT
+add-read-attribute-to-event --attribute-name averageSpeed --entity-name RouteSegment --event-name Travel
+add-read-attribute-to-event --attribute-name distance --entity-name RouteSegment --event-name Travel
+add-schedules-relation --condition-function "(assert true)" --end-event-name Arrive --start-event-name Travel --delay-function "(declare-fun averageSpeed () Int) (declare-fun distance () Int)	(declare-fun delay () Real)	(assert (= delay (to_real (div distance averageSpeed))))"
+add-write-attribute-to-event --attribute-name occupiedSeats --condition "(assert true)" --event-name LoadPassengers --entity-name Bus --write-function "(declare-fun servedPassengers () Int) (declare-fun value () Int) (declare-fun totalSeats () Int) (declare-fun waitingPassengers () Int) (assert (= servedPassengers (ite (<= waitingPassengers totalSeats) waitingPassengers totalSeats))) (assert (= value servedPassengers))"
+add-write-attribute-to-event --attribute-name waitingPassengers --condition "(assert true)" --entity-name BusStop --event-name LoadPassengers --write-function "(declare-fun totalSeats () Int)	(declare-fun waitingPassengers () Int) (declare-fun servedPassengers () Int) (declare-fun value () Int)	(assert (= servedPassengers (ite (<= waitingPassengers totalSeats) waitingPassengers totalSeats))) (assert (= value (- waitingPassengers servedPassengers)))"
